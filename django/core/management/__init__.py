@@ -15,6 +15,7 @@ from django.core.management.color import color_style
 from django.utils import lru_cache
 from django.utils import six
 
+module_suffixes = ['.py','.pyc','.so','.pyd']
 
 def find_commands(management_dir):
     """
@@ -25,8 +26,12 @@ def find_commands(management_dir):
     """
     command_dir = os.path.join(management_dir, 'commands')
     try:
-        return [f[:-3] for f in os.listdir(command_dir)
-                if not f.startswith('_') and f.endswith('.py')]
+        return [
+            file for (file,ext) in [
+                os.path.splitext( fullname )
+                for fullname in os.listdir(command_dir)
+            ] if (ext in module_suffixes and not file.startswith('_'))
+        ]
     except OSError:
         return []
 

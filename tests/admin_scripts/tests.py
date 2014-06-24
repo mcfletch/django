@@ -25,7 +25,7 @@ from django.core.management import BaseCommand, CommandError, call_command
 from django.db import connection
 from django.utils.encoding import force_text
 from django.utils._os import npath, upath
-from django.utils.six import StringIO
+from django.utils.six import StringIO, PY3
 from django.test import LiveServerTestCase, TestCase, override_settings
 from django.test.runner import DiscoverRunner
 
@@ -1138,6 +1138,31 @@ class ManageCheck(AdminScriptTestCase):
         out, err = self.run_manage(args)
         self.assertNoOutput(err)
         self.assertEqual(out, 'System check identified no issues (0 silenced).\n')
+    
+    def test_pyc_commands(self):
+        """ manage.py finds commands in pyc-only distribution formats"""
+        import os, compileall, shutil
+        HERE = os.path.dirname( __file__ )
+        source = os.path.join( HERE, 'management','commands','noargs_command.py' )
+        target = os.path.join( HERE, 'management','commands','pyc_command.py' )
+        shutil.copyfile( source, target )
+        if PY3:
+            # force compile to file-next-to-file location
+            compileall.compile_file( target, legacy=True )
+        else:
+            compileall.compile_file( target )
+        os.remove( target )
+        # Likely will *not* work on Jython or PyPy?
+        assert not os.path.exists( target ), """Failed to remove source .py file"""
+        assert os.path.exists( target+'c' ), """Didn't create the expected source-less import file"""
+        self.write_settings('settings.py',
+            apps=['admin_scripts',
+                ],
+            sdict={'DEBUG': True})
+        args = ['pyc_command']
+        out, err = self.run_manage(args)
+        self.assertNoOutput( err )
+        assert out.startswith( 'EXECUTE' )
 
     def test_output_format(self):
         """ All errors/warnings should be sorted by level and by message. """
